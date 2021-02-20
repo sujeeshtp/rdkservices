@@ -164,7 +164,7 @@ namespace WPEFramework {
 
         public:
             static DisplaySettings* _instance;
-            uint32_t m_status;
+            std:;string test;
 
         };
 	} // namespace Plugin
