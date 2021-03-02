@@ -22,6 +22,7 @@
 
 #include "DisplaySettings.h"
 #include <algorithm>
+#include <thread>
 #include "dsMgr.h"
 #include "libIBusDaemon.h"
 #include "host.hpp"
@@ -130,6 +131,9 @@ namespace WPEFramework {
 
         DisplaySettings* DisplaySettings::_instance = nullptr;
         IARM_Bus_PWRMgr_PowerState_t DisplaySettings::m_powerState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY;
+
+        std::mutex powerMutex;
+        static std::thread powerThread;
 
         DisplaySettings::DisplaySettings()
             : AbstractPlugin()
@@ -1882,7 +1886,7 @@ namespace WPEFramework {
                         returnResponse(false);
                 }
 
-                if (false == muted && IARM_BUS_PWRMGR_POWERSTATE_STANDBY == getSystemPowerState()) {
+                if (false == muted && IARM_BUS_PWRMGR_POWERSTATE_STANDBY == m_powerState) {
                         LOGWARN("Ignoring the setMuted(false) request based on the power state");
                         returnResponse(false);
                 }
@@ -1916,7 +1920,7 @@ namespace WPEFramework {
                         returnResponse(false);
                 }
 
-                if (IARM_BUS_PWRMGR_POWERSTATE_STANDBY == getSystemPowerState()) {
+                if (IARM_BUS_PWRMGR_POWERSTATE_STANDBY == m_powerState) {
                         LOGWARN("Ignoring the setVolumeLevel(%s) request based on the power state", sLevel.c_str());
                         returnResponse(false);
                 }
@@ -2643,7 +2647,7 @@ namespace WPEFramework {
                     returnResponse(false);
             }
 
-            if (true == pEnable && IARM_BUS_PWRMGR_POWERSTATE_STANDBY == getSystemPowerState()) {
+            if (true == pEnable && IARM_BUS_PWRMGR_POWERSTATE_STANDBY == m_powerState) {
                 LOGWARN("Ignoring the setEnableAudioPort(true) request based on the power state");
                 returnResponse(false);
             }
@@ -2783,7 +2787,13 @@ namespace WPEFramework {
                              eventData->data.state.curState, eventData->data.state.newState);
                 m_powerState = eventData->data.state.newState;
                 if (eventData->data.state.newState == IARM_BUS_PWRMGR_POWERSTATE_ON) {
-                    DisplaySettings::_instance->InitAudioPorts();
+                    powerThread = std::thread([]() {
+                        powerMutex.lock();
+                        LOGWARN("InitAudioPorts calling from thread\n");
+                        //DisplaySettings::_instance->InitAudioPorts();
+                        LOGWARN("InitAudioPorts calling from thread exited\n");
+                        powerMutex.unlock();
+                    });
                 }
             }
             break;
